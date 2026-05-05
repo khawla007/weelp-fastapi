@@ -10,6 +10,10 @@ from gateway.adapters.nominatim.place_adapter import NominatimPlaceAdapter
 from gateway.api.v1 import health, places
 from gateway.application.ports.place_provider import PlaceProvider
 from gateway.config import settings
+from gateway.observability.logging import configure_logging, logger
+from gateway.observability.middleware import RequestIdMiddleware
+
+configure_logging(settings.log_level)
 
 
 @asynccontextmanager
@@ -31,14 +35,26 @@ async def lifespan(app: FastAPI):
         ),
     )
     app.state.http = client
+
+    from gateway.observability.cache import init_cache, shutdown_cache
+
+    await init_cache(app)
+    logger.info("gateway.startup", redis_url=settings.redis_url)
     try:
         yield
     finally:
+        await shutdown_cache(app)
         await client.aclose()
+        logger.info("gateway.shutdown")
 
 
 app = FastAPI(title="Weelp Integration Gateway", version="0.1.0", lifespan=lifespan)
 
+from gateway.observability.limiter import limiter, register_limiter  # noqa: E402
+
+register_limiter(app, limiter)
+
+app.add_middleware(RequestIdMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
