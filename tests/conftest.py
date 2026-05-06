@@ -9,6 +9,8 @@ os.environ.setdefault("RATE_LIMIT_STORAGE_URI", "memory://")
 os.environ.setdefault("RATE_LIMIT_PER_MIN", "60")
 os.environ.setdefault("CIRCUIT_BREAKER_THRESHOLD", "3")
 os.environ.setdefault("CIRCUIT_BREAKER_TTL_SECONDS", "1")
+os.environ.setdefault("JWT_SECRET", "test-jwt-secret-do-not-use-in-prod")
+os.environ.setdefault("JWT_ALGORITHM", "HS256")
 
 
 @pytest.fixture
@@ -30,9 +32,13 @@ async def app_with_fake_redis(monkeypatch, fake_redis):
     monkeypatch.setattr(redis.asyncio, "from_url", lambda *a, **kw: fake_redis)
 
     from gateway.main import app
+    from gateway.observability.limiter import limiter
+
+    limiter.reset()
 
     yield app
 
+    limiter.reset()
     base_module.reset_breaker_factory()
     try:
         await fake_redis.aclose()

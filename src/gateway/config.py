@@ -14,8 +14,12 @@ class Settings(BaseSettings):
     circuit_breaker_threshold: int = 5
     circuit_breaker_ttl_seconds: int = 30
     rate_limit_per_min: int = 60
+    rate_limit_per_min_auth: int = 600
     rate_limit_storage_uri: str | None = None
     log_level: str = "INFO"
+
+    jwt_secret: str
+    jwt_algorithm: str = "HS256"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

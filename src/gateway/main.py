@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from gateway.adapters.factory import factory
 from gateway.adapters.mapbox.place_adapter import MapboxPlaceAdapter
 from gateway.adapters.nominatim.place_adapter import NominatimPlaceAdapter
-from gateway.api.v1 import health, places
+from gateway.api.v1 import auth, health, places
 from gateway.application.ports.place_provider import PlaceProvider
 from gateway.config import settings
 from gateway.observability.logging import configure_logging, logger
@@ -65,3 +65,4 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(places.router)
+app.include_router(auth.router)
