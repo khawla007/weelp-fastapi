@@ -33,7 +33,9 @@ async def app_with_fake_redis(monkeypatch, fake_redis):
 
     from gateway.main import app
     from gateway.observability.limiter import limiter
+    from gateway.observability.metrics import reset_for_tests
 
+    reset_for_tests()
     limiter.reset()
 
     yield app

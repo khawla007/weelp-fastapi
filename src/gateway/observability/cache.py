@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request
 
 from gateway.config import settings
 from gateway.observability.logging import logger
+from gateway.observability.metrics import record_cache_event
 
 CACHE_PREFIX = "weelp-gw:cache"
 
@@ -77,6 +78,8 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
             key = _build_key(namespace, request)
             t0 = time.perf_counter()
 
+            provider = request.query_params.get("provider", "mapbox")
+
             try:
                 cached_value = await redis_client.get(key)
             except redis.exceptions.RedisError as exc:
@@ -85,6 +88,9 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
                     op="get",
                     error=type(exc).__name__,
                 )
+                record_cache_event(
+                    "unavailable", namespace=namespace, provider=provider
+                )
                 return await func(*args, **kwargs)
 
             if cached_value is not None:
@@ -92,15 +98,17 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
                 logger.info(
                     "cache.hit",
                     namespace=namespace,
-                    provider=request.query_params.get("provider", "mapbox"),
+                    provider=provider,
                     path=request.url.path,
                     latency_ms=latency_ms,
                     cache_hit=True,
                 )
                 structlog.contextvars.bind_contextvars(cache_hit=True)
+                record_cache_event("hit", namespace=namespace, provider=provider)
                 return json.loads(cached_value)
 
             structlog.contextvars.bind_contextvars(cache_hit=False)
+            record_cache_event("miss", namespace=namespace, provider=provider)
             result = await func(*args, **kwargs)
 
             try:
@@ -111,6 +119,9 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
                     "cache.set_failed",
                     op="set",
                     error=type(exc).__name__,
+                )
+                record_cache_event(
+                    "set_failed", namespace=namespace, provider=provider
                 )
 
             return result

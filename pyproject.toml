@@ -19,6 +19,15 @@ dependencies = [
     "slowapi>=0.1.9",
     "structlog>=24.1.0",
     "pyjwt>=2.8.0",
+    "prometheus-fastapi-instrumentator==7.1.0",
+    # OTel pinned exactly: auto-instrumentations move fast and a floating range
+    # will silently produce a different image. Bump deliberately, not by drift.
+    "opentelemetry-api==1.41.1",
+    "opentelemetry-sdk==1.41.1",
+    "opentelemetry-exporter-otlp==1.41.1",
+    "opentelemetry-instrumentation-fastapi==0.62b1",
+    "opentelemetry-instrumentation-httpx==0.62b1",
+    "opentelemetry-instrumentation-redis==0.62b1",
 ]
 
 [build-system]

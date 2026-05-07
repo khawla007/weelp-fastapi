@@ -89,11 +89,33 @@ In dev they're the same string (`http://localhost:9100`). In prod they're concep
 
 | Probe | Source | Use |
 |---|---|---|
-| `GET /v1/health` | gateway | Liveness — does the process respond? |
+| `GET /v1/health` | gateway | Liveness — does the process respond? Always 200 once the worker is up. |
+| `GET /v1/ready` | gateway | Readiness — Redis pingable + every place provider answers a cheap probe. 503 with a JSON dependency list when something's wrong. Compose `service_healthy` should follow this, not `/v1/health`. |
 | `redis-cli ping` | redis container | Compose dependency gate (`condition: service_healthy`). |
 | Dockerfile `HEALTHCHECK` | container runtime | Lets orchestrators (compose, swarm, k8s) see liveness without curl gymnastics from the host. |
 
 Roadmap §6 keeps the canonical operational table — read it before adding new probes here.
+
+## Metrics and tracing (Phase 7)
+
+`/metrics` exposes Prometheus text-format histograms (HTTP latency by method/status) plus two custom series wired by the gateway:
+
+- `gateway_cache_events_total{event,namespace,provider}` — `event` is `hit|miss|set_failed|unavailable`.
+- `gateway_circuit_breaker_state{provider}` — `0` closed, `1` half-open, `2` open.
+
+The endpoint is **not safe to expose publicly** — label names tell an attacker which providers you talk to and how often. The nginx snippet locks `location = /metrics` to `127.0.0.1` by default; uncomment the `allow <prometheus-host-ip>;` line when you stand up a scraper.
+
+OpenTelemetry tracing is opt-in. Set `OTEL_EXPORTER_OTLP_ENDPOINT` (e.g. `http://otel-collector:4317`) and the gateway exports spans for FastAPI routes, httpx upstream calls, and Redis ops on the next boot. Leave it unset and the gateway logs `tracing.disabled` once at startup and never tries to export — a misconfigured collector won't take the gateway with it.
+
+For local trace exploration:
+
+```bash
+docker run -d --rm -p 4317:4317 -p 16686:16686 jaegertracing/all-in-one
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 docker compose up gateway
+# Visit http://localhost:16686 → service "weelp-gateway".
+```
+
+Sampling defaults to 10% (`OTEL_TRACES_SAMPLER_ARG=0.1`). Bump to `1.0` in dev when chasing a specific request.
 
 ## What's *not* in this folder
 

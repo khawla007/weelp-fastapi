@@ -12,6 +12,7 @@ from tenacity import (
 
 from gateway.config import settings
 from gateway.observability.logging import logger
+from gateway.observability.metrics import record_breaker_state
 
 _breaker_factory: AsyncCircuitBreakerFactory | None = None
 
@@ -67,6 +68,7 @@ class BaseHttpAdapter:
             async with breaker:
                 data = await self._do_get(path, **params)
         except OpenedState as exc:
+            record_breaker_state(provider, breaker.context.state)
             latency_ms = round((time.perf_counter() - t0) * 1000, 2)
             logger.warning(
                 "adapter.circuit_open",
@@ -79,6 +81,7 @@ class BaseHttpAdapter:
                 f"Circuit breaker open for provider '{provider}'"
             ) from exc
         except Exception as exc:
+            record_breaker_state(provider, breaker.context.state)
             latency_ms = round((time.perf_counter() - t0) * 1000, 2)
             logger.warning(
                 "adapter.upstream_error",
@@ -90,6 +93,7 @@ class BaseHttpAdapter:
             )
             raise
 
+        record_breaker_state(provider, breaker.context.state)
         latency_ms = round((time.perf_counter() - t0) * 1000, 2)
         logger.info(
             "adapter.upstream_call",

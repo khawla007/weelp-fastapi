@@ -14,6 +14,11 @@ class MapboxPlaceAdapter(BaseHttpAdapter, PlaceProvider):
         )
         return [self._to_canonical(f) for f in data.get("features", [])]
 
+    async def health(self) -> None:
+        r = await self._client.head(self._base_url, timeout=2.0)
+        if r.status_code >= 500:
+            raise RuntimeError(f"upstream returned {r.status_code}")
+
     async def reverse(self, lat: float, lng: float) -> CanonicalPlace | None:
         data = await self._get(
             f"/geocoding/v5/mapbox.places/{lng},{lat}.json",

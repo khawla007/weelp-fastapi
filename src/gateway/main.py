@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from gateway.adapters.factory import factory
 from gateway.adapters.mapbox.place_adapter import MapboxPlaceAdapter
 from gateway.adapters.nominatim.place_adapter import NominatimPlaceAdapter
-from gateway.api.v1 import auth, health, places
+from gateway.api.v1 import auth, health, places, ready
 from gateway.application.ports.place_provider import PlaceProvider
 from gateway.config import settings
 from gateway.observability.logging import configure_logging, logger
@@ -63,6 +63,17 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
+from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
+
+Instrumentator(
+    excluded_handlers=["/metrics", "/v1/health", "/v1/ready"],
+).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
+
+from gateway.observability.tracing import configure_tracing  # noqa: E402
+
+configure_tracing(app)
+
 app.include_router(health.router)
+app.include_router(ready.router)
 app.include_router(places.router)
 app.include_router(auth.router)

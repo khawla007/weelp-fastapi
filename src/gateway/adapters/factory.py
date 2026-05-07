@@ -16,5 +16,15 @@ class AdapterFactory:
         except KeyError as e:
             raise ValueError(f"No adapter registered for {port.__name__}:{name}") from e
 
+    def all_for(self, port: type[T]) -> list[tuple[str, T]]:
+        out: list[tuple[str, T]] = []
+        for (p, name), inst in self._registry.items():
+            if p is port:
+                out.append((name, inst))  # type: ignore[arg-type]
+        return out
+
+    def clear(self) -> None:
+        self._registry.clear()
+
 
 factory = AdapterFactory()
