@@ -1,0 +1,17 @@
+# Production overlay. Apply with:
+#   docker compose -f docker-compose.yml -f compose.prod.yml up -d
+#
+# Differences vs base:
+#   - Redis port is unmapped (no host exposure; nginx + the gateway are the only callers).
+#   - restart: unless-stopped on both services so a crash recovers without manual intervention.
+#   - Gateway port stays mapped to 127.0.0.1 only — host nginx terminates TLS.
+
+services:
+  gateway:
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9100:9100"
+
+  redis:
+    restart: unless-stopped
+    ports: !reset []

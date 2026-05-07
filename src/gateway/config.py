@@ -6,8 +6,9 @@ class Settings(BaseSettings):
     mapbox_base_url: str = "https://api.mapbox.com"
     nominatim_base_url: str = "https://nominatim.openstreetmap.org"
     nominatim_user_agent: str
-    gateway_port: int = 9000
-    cors_origins: str = "http://localhost:3000"
+    gateway_port: int = 9100
+    gateway_public_url: str = "http://localhost:9100"
+    cors_origins: str = "http://localhost:3000,https://weelp.com"
 
     redis_url: str = "redis://localhost:6379/0"
     cache_ttl_seconds: int = 300
