@@ -8,6 +8,7 @@ import redis.asyncio as aioredis
 import redis.exceptions
 import structlog
 from fastapi import FastAPI, Request
+from opentelemetry import trace
 
 from gateway.config import settings
 from gateway.observability.logging import logger
@@ -79,6 +80,7 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
             t0 = time.perf_counter()
 
             provider = request.query_params.get("provider", "mapbox")
+            span = trace.get_current_span()
 
             try:
                 cached_value = await redis_client.get(key)
@@ -90,6 +92,10 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
                 )
                 record_cache_event(
                     "unavailable", namespace=namespace, provider=provider
+                )
+                span.add_event(
+                    "cache.unavailable",
+                    {"namespace": namespace, "provider": provider, "key": key},
                 )
                 return await func(*args, **kwargs)
 
@@ -105,10 +111,18 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
                 )
                 structlog.contextvars.bind_contextvars(cache_hit=True)
                 record_cache_event("hit", namespace=namespace, provider=provider)
+                span.add_event(
+                    "cache.hit",
+                    {"namespace": namespace, "provider": provider, "key": key},
+                )
                 return json.loads(cached_value)
 
             structlog.contextvars.bind_contextvars(cache_hit=False)
             record_cache_event("miss", namespace=namespace, provider=provider)
+            span.add_event(
+                "cache.miss",
+                {"namespace": namespace, "provider": provider, "key": key},
+            )
             result = await func(*args, **kwargs)
 
             try:
@@ -122,6 +136,10 @@ def cached(namespace: str, ttl: int | None = None) -> Callable:
                 )
                 record_cache_event(
                     "set_failed", namespace=namespace, provider=provider
+                )
+                span.add_event(
+                    "cache.set_failed",
+                    {"namespace": namespace, "provider": provider, "key": key},
                 )
 
             return result

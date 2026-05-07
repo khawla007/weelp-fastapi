@@ -78,3 +78,37 @@ jobs:
           path: coverage.xml
           if-no-files-found: error
           retention-days: 14
+
+  openapi-snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.8.22"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Regenerate openapi.snapshot.json
+        env:
+          MAPBOX_TOKEN: ci-test-token
+          JWT_SECRET: ci-test-secret-32-bytes-padded-xx
+          NOMINATIM_USER_AGENT: weelp-gateway-ci/0.1
+        run: |
+          uv run python -c "import os, sys, json, io; sys.stdout, _o = io.StringIO(), sys.stdout; from gateway.main import app; spec = app.openapi(); sys.stdout = _o; print(json.dumps(spec, indent=2))" > /tmp/regen.snapshot.json
+
+      - name: Fail if snapshot is stale
+        run: |
+          if ! diff -q /tmp/regen.snapshot.json openapi.snapshot.json; then
+            echo "::error::openapi.snapshot.json is stale. Regenerate it and commit alongside the DTO change so the frontend drift check stays accurate."
+            diff -u openapi.snapshot.json /tmp/regen.snapshot.json || true
+            exit 1
+          fi
